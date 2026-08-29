@@ -1,0 +1,63 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: lciis
+      POSTGRES_PASSWORD: lciis
+      POSTGRES_DB: lciis
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lciis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  backend:
+    build: ./backend
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+psycopg2://lciis:lciis@timescaledb:5432/lciis
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      RUN_TIMESCALE_INIT: "1"
+    volumes:
+      - ./ml:/srv/backend/ml
+    ports:
+      - "8000:8000"
+
+  hl7-bridge:
+    build: ./hl7
+    depends_on:
+      - backend
+    environment:
+      LCIIS_API_URL: http://backend:8000
+    command: ["--host", "0.0.0.0", "--port", "6661", "--api-url", "http://backend:8000"]
+    ports:
+      - "6661:6661"
+
+  dashboard:
+    build:
+      context: ./dashboard
+      args:
+        VITE_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  timescale_data:

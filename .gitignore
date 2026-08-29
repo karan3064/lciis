@@ -1,0 +1,13 @@
+backend/.venv/
+backend/**/__pycache__/
+backend/.env
+*.db
+*.pyc
+
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.env
+
+ml/risk_model.joblib
+
+.DS_Store
