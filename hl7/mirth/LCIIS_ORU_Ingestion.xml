@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<channel version="4.5.2">
+  <id>c4716d9e-2ea0-4717-9154-ad28a5ac7554</id>
+  <nextMetaDataId>2</nextMetaDataId>
+  <name>LCIIS - HL7 ORU Ingestion</name>
+  <description>Listens for HL7 v2.x ORU^R01 lab result messages over TCP/MLLP from the hospital LIS, parses the PID/PV1/OBX segments, and POSTs one JSON payload per OBX result to the LCIIS backend's /api/lab-result endpoint. See hl7/README.md and hl7/hl7_parser.py for the equivalent standalone-bridge implementation of this same logic.</description>
+  <enabled>true</enabled>
+  <lastModified>
+    <time>0</time>
+    <timezone>UTC</timezone>
+  </lastModified>
+  <revision>1</revision>
+  <sourceConnector version="4.5.2">
+    <metaDataId>0</metaDataId>
+    <name>sourceConnector</name>
+    <properties class="com.mirth.connect.connectors.tcp.TcpReceiverProperties" version="4.5.2">
+      <pluginProperties/>
+      <listenerConnectorProperties version="4.5.2">
+        <host>0.0.0.0</host>
+        <port>6661</port>
+      </listenerConnectorProperties>
+      <sourceConnectorProperties version="4.5.2">
+        <responseVariable>None</responseVariable>
+        <respondAfterProcessing>true</respondAfterProcessing>
+        <processBatch>false</processBatch>
+        <firstResponse>false</firstResponse>
+        <processingThreads>1</processingThreads>
+        <resourceIds class="linked-hash-map">
+          <entry>
+            <string>Default Resource</string>
+            <string>[Default Resource]</string>
+          </entry>
+        </resourceIds>
+        <queueBufferSize>1000</queueBufferSize>
+      </sourceConnectorProperties>
+      <transmissionModeProperties class="com.mirth.connect.model.transmission.framemode.FrameModeProperties" version="4.5.2">
+        <pluginPointName>MLLP</pluginPointName>
+        <startOfMessageBytes>0x0B</startOfMessageBytes>
+        <endOfMessageBytes>0x1C, 0x0D</endOfMessageBytes>
+      </transmissionModeProperties>
+      <serverMode>true</serverMode>
+      <remoteAddress/>
+      <remotePort>6660</remotePort>
+      <overrideLocalBinding>false</overrideLocalBinding>
+      <reconnectInterval>5000</reconnectInterval>
+      <receiveTimeout>0</receiveTimeout>
+      <bufferSize>65536</bufferSize>
+      <maxConnections>10</maxConnections>
+      <keepConnectionOpen>true</keepConnectionOpen>
+      <dataTypeBinary>false</dataTypeBinary>
+      <charsetEncoding>UTF-8</charsetEncoding>
+      <respondOnNewConnection>0</respondOnNewConnection>
+      <responseAddress/>
+      <responsePort/>
+    </properties>
+    <transformer version="4.5.2">
+      <elements>
+        <com.mirth.connect.plugins.javascriptstep.JavaScriptStep version="4.5.2">
+          <name>Parse HL7 ORU and build LCIIS payloads</name>
+          <sequenceNumber>0</sequenceNumber>
+          <enabled>true</enabled>
+          <script><![CDATA[
+// Converts the inbound ORU^R01 message's PID/PV1/OBX segments into the JSON
+// array LCIIS's POST /api/lab-result endpoint expects. Equivalent logic to
+// hl7/hl7_parser.py, used when running the standalone MLLP bridge instead.
+
+var patientId = msg['PID']['PID.3']['PID.3.1'].toString();
+var lastName = msg['PID']['PID.5']['PID.5.1'].toString();
+var firstName = msg['PID']['PID.5']['PID.5.2'].toString();
+var patientName = (firstName + ' ' + lastName).trim() || patientId;
+
+var ward = msg['PV1']['PV1.3']['PV1.3.1'].toString();
+var bed = msg['PV1']['PV1.3']['PV1.3.2'].toString();
+
+var doctorFamily = msg['PV1']['PV1.7']['PV1.7.2'].toString();
+var doctorGiven = msg['PV1']['PV1.7']['PV1.7.3'].toString();
+var physician = doctorFamily ? ('Dr. ' + doctorFamily + ' ' + doctorGiven).trim() : null;
+
+function formatHl7Timestamp(ts) {
+    if (!ts || ts.length < 8) { return new Date().toISOString(); }
+    var y = ts.substring(0, 4), mo = ts.substring(4, 6), d = ts.substring(6, 8);
+    var h = ts.length >= 10 ? ts.substring(8, 10) : '00';
+    var mi = ts.length >= 12 ? ts.substring(10, 12) : '00';
+    var s = ts.length >= 14 ? ts.substring(12, 14) : '00';
+    return y + '-' + mo + '-' + d + 'T' + h + ':' + mi + ':' + s;
+}
+
+var results = [];
+var obxCount = msg['OBX'].length();
+for (var i = 0; i < obxCount; i++) {
+    var obx = msg['OBX'][i];
+    var code = obx['OBX.3']['OBX.3.1'].toString();
+    var name = obx['OBX.3']['OBX.3.2'].toString() || code;
+    var value = parseFloat(obx['OBX.5']['OBX.5.1'].toString());
+    if (isNaN(value)) { continue; } // skip free-text / non-numeric OBX rows
+
+    var unit = obx['OBX.6']['OBX.6.1'].toString() || null;
+    var refRange = obx['OBX.7'].toString();
+    var refLow = null, refHigh = null;
+    if (refRange.indexOf('-') > -1) {
+        var parts = refRange.split('-');
+        refLow = parseFloat(parts[0]);
+        refHigh = parseFloat(parts[1]);
+    }
+
+    var observedAt = obx['OBX.14']['OBX.14.1'].toString() ||
+                      msg['OBR']['OBR.7']['OBR.7.1'].toString();
+
+    results.push({
+        patient_id: patientId,
+        patient_name: patientName,
+        bed: bed || null,
+        ward: ward || null,
+        test_code: code,
+        test_name: name,
+        value: value,
+        unit: unit,
+        ref_low: isNaN(refLow) ? null : refLow,
+        ref_high: isNaN(refHigh) ? null : refHigh,
+        ordering_physician: physician,
+        collected_at: formatHl7Timestamp(observedAt)
+    });
+}
+
+channelMap.put('labResultPayloads', JSON.stringify(results));
+]]></script>
+        </com.mirth.connect.plugins.javascriptstep.JavaScriptStep>
+      </elements>
+      <inboundTemplate encoding="base64"></inboundTemplate>
+      <inboundDataType>HL7V2</inboundDataType>
+      <outboundDataType>HL7V2</outboundDataType>
+      <inboundProperties class="com.mirth.connect.plugins.datatypes.hl7v2.HL7v2DataTypeProperties" version="4.5.2">
+        <serializationProperties class="com.mirth.connect.plugins.datatypes.hl7v2.HL7v2SerializationProperties" version="4.5.2">
+          <handleRepetitions>true</handleRepetitions>
+          <handleSubcomponents>true</handleSubcomponents>
+          <useStrictParser>false</useStrictParser>
+          <useStrictValidation>false</useStrictValidation>
+          <stripNamespaces>true</stripNamespaces>
+          <segmentDelimiter>\r</segmentDelimiter>
+          <convertLineBreaks>true</convertLineBreaks>
+        </serializationProperties>
+      </inboundProperties>
+      <outboundProperties class="com.mirth.connect.plugins.datatypes.hl7v2.HL7v2DataTypeProperties" version="4.5.2">
+        <serializationProperties class="com.mirth.connect.plugins.datatypes.hl7v2.HL7v2SerializationProperties" version="4.5.2">
+          <handleRepetitions>true</handleRepetitions>
+          <handleSubcomponents>true</handleSubcomponents>
+          <useStrictParser>false</useStrictParser>
+          <useStrictValidation>false</useStrictValidation>
+          <stripNamespaces>true</stripNamespaces>
+          <segmentDelimiter>\r</segmentDelimiter>
+          <convertLineBreaks>true</convertLineBreaks>
+        </serializationProperties>
+      </outboundProperties>
+    </transformer>
+    <filter version="4.5.2">
+      <elements>
+        <com.mirth.connect.plugins.javascriptrule.JavaScriptRule version="4.5.2">
+          <name>Only accept ORU^R01</name>
+          <sequenceNumber>0</sequenceNumber>
+          <enabled>true</enabled>
+          <script><![CDATA[
+var messageType = msg['MSH']['MSH.9']['MSH.9.1'].toString();
+var triggerEvent = msg['MSH']['MSH.9']['MSH.9.2'].toString();
+return (messageType == 'ORU' && triggerEvent == 'R01');
+]]></script>
+        </com.mirth.connect.plugins.javascriptrule.JavaScriptRule>
+      </elements>
+    </filter>
+    <transportName>TCP Listener</transportName>
+    <mode>SOURCE</mode>
+    <enabled>true</enabled>
+    <waitForPrevious>true</waitForPrevious>
+  </sourceConnector>
+  <destinationConnectors>
+    <connector version="4.5.2">
+      <metaDataId>1</metaDataId>
+      <name>Post lab results to LCIIS API</name>
+      <properties class="com.mirth.connect.connectors.js.JavaScriptDispatcherProperties" version="4.5.2">
+        <pluginProperties/>
+        <destinationConnectorProperties version="4.5.2">
+          <queueEnabled>true</queueEnabled>
+          <sendFirst>false</sendFirst>
+          <retryIntervalMillis>10000</retryIntervalMillis>
+          <regenerateTemplate>false</regenerateTemplate>
+          <retryCount>3</retryCount>
+          <rotate>false</rotate>
+          <includeFilterTransformer>false</includeFilterTransformer>
+          <threadCount>1</threadCount>
+          <threadAssignmentVariable/>
+          <validateResponse>false</validateResponse>
+          <resourceIds class="linked-hash-map">
+            <entry>
+              <string>Default Resource</string>
+              <string>[Default Resource]</string>
+            </entry>
+          </resourceIds>
+          <queueBufferSize>1000</queueBufferSize>
+          <reattachAttachments>true</reattachAttachments>
+        </destinationConnectorProperties>
+        <script><![CDATA[
+// Posts one HTTP request per OBX-derived lab result to the LCIIS backend.
+// The API base URL is read from the Configuration Map key LCIIS_API_URL
+// (Mirth Administrator > Settings > Configuration Map) so it doesn't need
+// to be hardcoded per environment; falls back to localhost for dev.
+
+importPackage(java.net);
+importPackage(java.io);
+
+var apiBaseUrl = configurationMap.get('LCIIS_API_URL');
+if (!apiBaseUrl) { apiBaseUrl = 'http://localhost:8000'; }
+
+var payloadsJson = channelMap.get('labResultPayloads');
+var payloads = JSON.parse(payloadsJson);
+
+var results = [];
+for (var i = 0; i < payloads.length; i++) {
+    var payload = payloads[i];
+    var url = new URL(apiBaseUrl + '/api/lab-result');
+    var conn = url.openConnection();
+    conn.setRequestMethod('POST');
+    conn.setDoOutput(true);
+    conn.setRequestProperty('Content-Type', 'application/json');
+    conn.setConnectTimeout(10000);
+    conn.setReadTimeout(10000);
+
+    var body = JSON.stringify(payload);
+    var out = conn.getOutputStream();
+    out.write(java.lang.String(body).getBytes('UTF-8'));
+    out.flush();
+    out.close();
+
+    var status = conn.getResponseCode();
+    if (status >= 400) {
+        var stream = conn.getErrorStream();
+        var errText = '';
+        if (stream != null) {
+            var scanner = new java.util.Scanner(stream, 'UTF-8').useDelimiter('\\A');
+            errText = scanner.hasNext() ? scanner.next() : '';
+        }
+        throw 'LCIIS API returned HTTP ' + status + ' for ' + payload.test_code +
+              ' (' + payload.patient_id + '): ' + errText;
+    }
+    results.push(payload.test_code + '=' + status);
+    conn.disconnect();
+}
+
+return 'Posted ' + results.length + ' result(s): ' + results.join(', ');
+]]></script>
+      </properties>
+      <transformer version="4.5.2">
+        <elements/>
+        <inboundTemplate encoding="base64"></inboundTemplate>
+        <inboundDataType>HL7V2</inboundDataType>
+        <outboundDataType>HL7V2</outboundDataType>
+        <inboundProperties class="com.mirth.connect.plugins.datatypes.hl7v2.HL7v2DataTypeProperties" version="4.5.2"/>
+        <outboundProperties class="com.mirth.connect.plugins.datatypes.hl7v2.HL7v2DataTypeProperties" version="4.5.2"/>
+      </transformer>
+      <responseTransformer version="4.5.2">
+        <elements/>
+      </responseTransformer>
+      <filter version="4.5.2">
+        <elements/>
+      </filter>
+      <transportName>JavaScript Writer</transportName>
+      <mode>DESTINATION</mode>
+      <enabled>true</enabled>
+      <waitForPrevious>true</waitForPrevious>
+    </connector>
+  </destinationConnectors>
+  <preprocessingScript><![CDATA[return message;]]></preprocessingScript>
+  <postprocessingScript><![CDATA[return;]]></postprocessingScript>
+  <deployScript><![CDATA[return;]]></deployScript>
+  <undeployScript><![CDATA[return;]]></undeployScript>
+  <properties version="4.5.2">
+    <clearGlobalChannelMap>true</clearGlobalChannelMap>
+    <messageStorageMode>PRODUCTION</messageStorageMode>
+    <encryptData>false</encryptData>
+    <removeContentOnCompletion>false</removeContentOnCompletion>
+    <removeOnlyFilteredOnCompletion>false</removeOnlyFilteredOnCompletion>
+    <removeAttachmentsOnCompletion>false</removeAttachmentsOnCompletion>
+    <initialState>STARTED</initialState>
+    <storeAttachments>false</storeAttachments>
+    <metaDataColumns>
+      <metaDataColumn>
+        <name>SOURCE</name>
+        <type>STRING</type>
+        <mappingName>mirth_source</mappingName>
+      </metaDataColumn>
+      <metaDataColumn>
+        <name>TYPE</name>
+        <type>STRING</type>
+        <mappingName>mirth_type</mappingName>
+      </metaDataColumn>
+    </metaDataColumns>
+    <resourceIds class="linked-hash-map">
+      <entry>
+        <string>Default Resource</string>
+        <string>[Default Resource]</string>
+      </entry>
+    </resourceIds>
+  </properties>
+  <exportData>
+    <metadata>
+      <enabled>true</enabled>
+      <pruningSettings>
+        <archiveEnabled>true</archiveEnabled>
+        <pruneErroredMessages>false</pruneErroredMessages>
+      </pruningSettings>
+    </metadata>
+    <dependentIds/>
+    <dependencyIds/>
+  </exportData>
+</channel>

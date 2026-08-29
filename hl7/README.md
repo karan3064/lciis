@@ -28,24 +28,27 @@ admission message.
 
 ## 2. Production: Mirth Connect
 
-For a real hospital deployment, replace the bridge with a Mirth Connect
-channel:
+For a real hospital deployment, replace the bridge with a real Mirth
+Connect (NextGen Connect) channel. `mirth/` has two ready-to-import
+channel exports plus a manual fallback:
 
-1. **Source connector** — TCP Listener, MLLP framing (`0x0B`/`0x1C 0x0D`),
-   listening on the port the hospital LIS is configured to send to.
-2. **Transformer** — paste `mirth/transformer.js`. It walks the PID/PV1/OBX
-   segments and builds the same JSON shape `hl7_parser.py` produces.
-3. **Destination** — HTTP Sender, `POST` to
-   `http://<lciis-host>:8000/api/lab-result`, one request per OBX row
-   (iterate over `channelMap.get('labResultPayloads')`), Content-Type
-   `application/json`.
-4. **Error handling** — enable Mirth's built-in destination queue with
-   retry-on-failure so a transient LCIIS outage doesn't drop results;
-   messages that fail to parse land in the channel's error queue for
-   manual review.
-5. **ADT^A01** — a second, simpler channel (Transformer just maps PID/PV1
-   to `POST /api/patients`) keeps patient demographics/bed assignment in
-   sync as patients are admitted/transferred.
+- `mirth/LCIIS_ORU_Ingestion.xml` — TCP Listener (MLLP) → JavaScript
+  Transformer (parses PID/PV1/OBX) → JavaScript Writer destination that
+  POSTs one request per OBX row to `/api/lab-result`.
+- `mirth/LCIIS_ADT_PatientSync.xml` — same pattern for `ADT^A01` →
+  `POST /api/patients`.
+- `mirth/transformer.js` — the transformer script alone, for reference or
+  copy-paste.
+- `mirth/MANUAL_CHANNEL_SETUP.md` — click-by-click instructions to build
+  either channel by hand in Mirth Administrator, in case the XML import
+  doesn't take cleanly on your Mirth version (these exports target 4.5.x
+  and were hand-built against the documented schema, not validated
+  against a running Mirth instance — see that file for why).
+
+**Import:** Mirth Administrator → **Channels → Import Channel** → select
+the `.xml` file → set the destination's `LCIIS_API_URL` via **Settings →
+Configuration Map** (defaults to `http://localhost:8000` if unset) → set
+the destination queue to retry-on-failure → **Deploy**.
 
 Both paths converge on the same backend contract, so the trend engine,
 ML engine, and dashboard behave identically regardless of which one feeds
