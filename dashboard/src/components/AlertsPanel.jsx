@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { acknowledgeAlert, getAlerts } from "../api/client";
+import { timeAgo } from "../utils/time";
 import SeverityBadge from "./SeverityBadge";
 
 const REFRESH_MS = 5000;
@@ -11,7 +12,10 @@ export default function AlertsPanel({ onSelectPatient }) {
 
   const refresh = () => {
     getAlerts({ activeOnly: true })
-      .then(setAlerts)
+      .then((data) => {
+        setAlerts(data);
+        setError(null);
+      })
       .catch(() => setError("Could not reach LCIIS API"));
   };
 
@@ -28,9 +32,12 @@ export default function AlertsPanel({ onSelectPatient }) {
 
   return (
     <div className="panel">
-      <h2>Active Alerts</h2>
+      <div className="panel-header">
+        <h2>Active Alerts</h2>
+        {alerts.length > 0 && <span className="panel-count panel-count-alert">{alerts.length}</span>}
+      </div>
       {error && <p className="error">{error}</p>}
-      {alerts.length === 0 && !error && <p className="muted">No active alerts.</p>}
+      {alerts.length === 0 && !error && <p className="muted">No active alerts — all patients stable.</p>}
       <ul className="alert-list">
         {alerts.map((alert) => (
           <li key={alert.id} className={`alert-item severity-${alert.severity}`}>
@@ -45,18 +52,23 @@ export default function AlertsPanel({ onSelectPatient }) {
               >
                 {alert.patient_id}
               </button>
-              <span className="alert-message">{alert.message}</span>
-              <span className="alert-source">{alert.source === "ml_engine" ? "ML" : "Rule"}</span>
+              <span className="alert-source-tag">{alert.source === "ml_engine" ? "ML" : "Rule"}</span>
             </div>
+            <p className="alert-message">{alert.message}</p>
+            <p className="alert-timestamp">{timeAgo(alert.triggered_at)}</p>
             {expandedId === alert.id && (
               <div className="alert-details">
                 {alert.explanation && <p>{alert.explanation}</p>}
-                <p className="muted">
-                  Triggered {new Date(alert.triggered_at).toLocaleString()}
-                  {alert.risk_score != null && ` · risk score ${alert.risk_score.toFixed(2)}`}
-                </p>
+                {alert.risk_score != null && (
+                  <p className="muted">Risk score {alert.risk_score.toFixed(2)}</p>
+                )}
                 <button onClick={() => handleAck(alert.id)}>Acknowledge</button>
               </div>
+            )}
+            {expandedId !== alert.id && (
+              <button className="expand-hint" onClick={() => setExpandedId(alert.id)}>
+                Details
+              </button>
             )}
           </li>
         ))}

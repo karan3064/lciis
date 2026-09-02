@@ -6,6 +6,9 @@ export const api = axios.create({ baseURL: API_BASE_URL });
 
 export const getPatients = () => api.get("/api/patients").then((r) => r.data);
 
+export const getPatientSummaries = () =>
+  api.get("/api/patients/summary").then((r) => r.data);
+
 export const getPatientTrend = (patientId) =>
   api.get(`/api/patients/${patientId}/trend`).then((r) => r.data);
 

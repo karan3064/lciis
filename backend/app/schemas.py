@@ -96,3 +96,30 @@ class TrendSeries(BaseModel):
     test_name: str
     unit: Optional[str]
     points: list[TrendPoint]
+
+
+class VitalsSnapshot(BaseModel):
+    spo2: Optional[float] = None
+    heart_rate: Optional[float] = None
+    temperature: Optional[float] = None
+    recorded_at: Optional[datetime] = None
+
+
+class LastLabResult(BaseModel):
+    test_name: str
+    value: float
+    unit: Optional[str]
+    collected_at: datetime
+
+
+class PatientSummary(BaseModel):
+    id: str
+    name: str
+    bed: Optional[str]
+    ward: Optional[str]
+    admitted_at: datetime
+    worst_active_severity: Optional[str] = None
+    active_alert_count: int = 0
+    worst_active_alert_message: Optional[str] = None
+    vitals: VitalsSnapshot
+    last_lab_result: Optional[LastLabResult] = None

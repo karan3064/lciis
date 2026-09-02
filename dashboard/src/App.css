@@ -4,31 +4,119 @@
   flex-direction: column;
 }
 
+/* ---------- Header ---------- */
+
 .app-header {
-  padding: 16px 24px;
+  padding: 14px 28px;
   border-bottom: 1px solid var(--border);
+  background: var(--panel-bg);
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-header-title {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
+.app-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), #7c5cff);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
 .app-header h1 {
-  font-size: 22px;
-  letter-spacing: -0.5px;
+  font-size: 18px;
+  line-height: 1.2;
 }
 
 .subtitle {
-  font-size: 13px;
-  opacity: 0.6;
+  font-size: 12px;
+  color: var(--muted);
 }
+
+.app-header-stats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.header-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 44px;
+}
+
+.header-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-h);
+  line-height: 1.2;
+}
+
+.header-stat-red .header-stat-value {
+  color: #f04438;
+}
+
+.header-stat-amber .header-stat-value {
+  color: #f79009;
+}
+
+.header-stat-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #12b76a;
+  background: rgba(18, 183, 106, 0.1);
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #12b76a;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(18, 183, 106, 0.5); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(18, 183, 106, 0); }
+}
+
+/* ---------- Layout ---------- */
 
 .layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 340px 1fr;
   gap: 20px;
-  padding: 20px;
-  max-width: 1400px;
+  padding: 20px 28px;
+  max-width: 1500px;
   margin: 0 auto;
   width: 100%;
 }
@@ -42,88 +130,252 @@
 .panel {
   background: var(--panel-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.panel-header h2 {
+  font-size: 15px;
+}
+
+.panel-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--panel-bg-2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 9px;
+}
+
+.panel-count-alert {
+  color: #fff;
+  background: #f04438;
+  border-color: #f04438;
 }
 
 .main {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
+  min-width: 0;
 }
 
-.patient-list, .alert-list {
+.empty-state {
+  background: var(--panel-bg);
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+/* ---------- Patient list ---------- */
+
+.patient-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
-.patient-btn {
+.patient-card {
   width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   text-align: left;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 8px 10px;
-  color: var(--text-h);
+  border-radius: 12px;
+  padding: 10px;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.patient-btn:hover {
-  border-color: var(--border);
+.patient-card:hover {
+  background: var(--panel-bg-2);
 }
 
-.patient-btn.active {
-  background: rgba(21, 112, 239, 0.1);
+.patient-card.active {
+  background: var(--accent-soft);
   border-color: var(--accent);
+}
+
+.patient-ring {
+  --ring-color: var(--muted);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ring-color);
+  background: color-mix(in srgb, var(--ring-color) 16%, transparent);
+  box-shadow: inset 0 0 0 2px var(--ring-color);
+}
+
+.patient-ring-lg {
+  width: 52px;
+  height: 52px;
+  font-size: 17px;
+}
+
+.patient-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.patient-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.patient-name {
+  font-weight: 650;
+  color: var(--text-h);
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.patient-alert-count {
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  border-radius: 20px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+
+.patient-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.patient-meta-sep {
+  margin-left: 2px;
+}
+
+.patient-vitals {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.vital-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--panel-bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px 6px;
+}
+
+/* ---------- Alerts ---------- */
+
+.alert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .alert-item {
   border: 1px solid var(--border);
-  border-left-width: 4px;
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-left-width: 3px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--panel-bg-2);
 }
 
-.alert-item.severity-red {
-  border-left-color: #d92d20;
-}
-
-.alert-item.severity-amber {
-  border-left-color: #dc6803;
-}
-
-.alert-item.severity-yellow {
-  border-left-color: #eaaa08;
-}
+.alert-item.severity-red { border-left-color: #f04438; }
+.alert-item.severity-amber { border-left-color: #f79009; }
+.alert-item.severity-yellow { border-left-color: #eaaa08; }
 
 .alert-row {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px 8px;
+  gap: 8px;
   cursor: pointer;
 }
 
-.alert-message {
-  flex-basis: 100%;
-  font-size: 13px;
-  line-height: 1.4;
+.severity-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
 }
 
-.alert-source {
-  font-size: 11px;
-  opacity: 0.6;
+.alert-source-tag {
   margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
+.alert-message {
+  margin: 8px 0 2px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.alert-timestamp {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .link-btn {
   background: none;
   border: none;
   color: var(--accent);
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 0;
+}
+
+.expand-hint {
+  margin-top: 6px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 11.5px;
   font-weight: 600;
   padding: 0;
 }
@@ -132,10 +384,10 @@
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px dashed var(--border);
-  font-size: 13px;
+  font-size: 12.5px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   align-items: flex-start;
 }
 
@@ -143,6 +395,130 @@
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* ---------- Patient header / vitals ---------- */
+
+.patient-header {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+
+.patient-header-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.patient-header-name {
+  font-size: 20px;
+}
+
+.patient-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.patient-header-status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.patient-header-banner {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  background: var(--panel-bg-2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.stat-tiles {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.stat-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.stat-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.stat-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value-sm {
+  font-size: 13px;
+}
+
+.stat-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 2px;
+}
+
+.stat-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* ---------- Trend chart card ---------- */
+
+.chart-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .stat-tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
